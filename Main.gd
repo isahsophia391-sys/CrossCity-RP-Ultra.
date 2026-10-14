@@ -1,136 +1,101 @@
+
 extends Node3D
 
-# CrossCity RP Ultra — nova base urbana 3D
-# Protótipo visual: ainda não inclui multiplayer nem veículos dirigíveis.
-
-const ROAD := Color(0.10, 0.11, 0.13)
-const SIDEWALK := Color(0.48, 0.49, 0.48)
-const GRASS := Color(0.16, 0.30, 0.17)
+const VELOCIDADE := 6.0
+var direcao := Vector2.ZERO
+var jogador: CharacterBody3D
+var camera: Camera3D
 
 func _ready() -> void:
-    criar_chao()
-    criar_ruas()
-    criar_quarteiroes()
-    criar_praca()
-    criar_jogador_teste()
-    criar_iluminacao()
-    criar_camera()
-
-func material(cor: Color, rugosidade: float = 0.85) -> StandardMaterial3D:
-    var m := StandardMaterial3D.new()
-    m.albedo_color = cor
-    m.roughness = rugosidade
-    return m
-
-func cubo(nome: String, tamanho: Vector3, pos: Vector3, cor: Color) -> void:
-    var obj := MeshInstance3D.new()
-    obj.name = nome
-    var malha := BoxMesh.new()
-    malha.size = tamanho
-    obj.mesh = malha
-    obj.position = pos
-    obj.material_override = material(cor)
-    add_child(obj)
-
-func criar_chao() -> void:
-    var chao := MeshInstance3D.new()
-    var malha := PlaneMesh.new()
-    malha.size = Vector2(300, 300)
-    chao.mesh = malha
-    chao.material_override = material(GRASS)
-    chao.position.y = -0.15
-    add_child(chao)
-
-func criar_ruas() -> void:
-    for p in range(-120, 121, 60):
-        cubo("Rua_vertical", Vector3(18, 0.12, 300),
-            Vector3(p, 0, 0), ROAD)
-        cubo("Calcada_esquerda", Vector3(3, 0.18, 300),
-            Vector3(p - 10.5, 0.02, 0), SIDEWALK)
-        cubo("Calcada_direita", Vector3(3, 0.18, 300),
-            Vector3(p + 10.5, 0.02, 0), SIDEWALK)
-
-        cubo("Rua_horizontal", Vector3(300, 0.12, 18),
-            Vector3(0, 0.01, p), ROAD)
-        cubo("Calcada_superior", Vector3(300, 0.18, 3),
-            Vector3(0, 0.03, p - 10.5), SIDEWALK)
-        cubo("Calcada_inferior", Vector3(300, 0.18, 3),
-            Vector3(0, 0.03, p + 10.5), SIDEWALK)
-
-func criar_quarteiroes() -> void:
-    var cores: Array[Color] = [
-        Color(0.66, 0.65, 0.62),
-        Color(0.72, 0.70, 0.64),
-        Color(0.43, 0.48, 0.52),
-        Color(0.78, 0.77, 0.73),
-        Color(0.57, 0.59, 0.60)
-    ]
-
-    var indice := 0
-
-    for x in range(-100, 101, 60):
-        for z in range(-100, 101, 60):
-            if abs(x) < 25 and abs(z) < 25:
-                continue
-
-            var altura := 12.0 + float((indice * 13) % 34)
-            var largura := 19.0 + float(indice % 3) * 3.0
-
-            cubo("Edificio_%02d" % indice,
-                Vector3(largura, altura, 20),
-                Vector3(x, altura / 2.0, z),
-                cores[indice % cores.size()])
-
-            # Faixa escura na fachada para sugerir janelas.
-            cubo("Fachada_vidros_%02d" % indice,
-                Vector3(largura * 0.72, altura * 0.60, 0.18),
-                Vector3(x, altura * 0.58, z + 10.11),
-                Color(0.12, 0.22, 0.29))
-
-            indice += 1
-
-func criar_praca() -> void:
-    cubo("Praca", Vector3(28, 0.15, 28),
-        Vector3(0, 0.02, 0), Color(0.30, 0.37, 0.28))
-
-    for p in [Vector2(-8, -8), Vector2(8, -8),
-              Vector2(-8, 8), Vector2(8, 8)]:
-        cubo("Arvore_tronco", Vector3(0.7, 3, 0.7),
-            Vector3(p.x, 1.5, p.y), Color(0.28, 0.18, 0.10))
-        cubo("Arvore_copa", Vector3(3.5, 3.5, 3.5),
-            Vector3(p.x, 4, p.y), Color(0.12, 0.29, 0.13))
-
-func criar_jogador_teste() -> void:
-    var jogador := MeshInstance3D.new()
-    jogador.name = "Marcador_Jogador"
-    var malha := CapsuleMesh.new()
-    malha.radius = 0.55
-    malha.height = 2.0
-    jogador.mesh = malha
-    jogador.position = Vector3(4, 1, 4)
-    jogador.material_override = material(Color(0.35, 0.18, 0.65))
+    jogador = CharacterBody3D.new()
+    jogador.name = "Jogador"
     add_child(jogador)
+    jogador.position = Vector3(0, 1, 0)
 
-func criar_iluminacao() -> void:
-    var mundo := WorldEnvironment.new()
-    var ambiente := Environment.new()
-    ambiente.background_mode = Environment.BG_SKY
-    ambiente.sky = Sky.new()
-    ambiente.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-    ambiente.ambient_light_color = Color(0.65, 0.72, 0.85)
-    ambiente.ambient_light_energy = 0.65
-    mundo.environment = ambiente
-    add_child(mundo)
+    var colisao := CollisionShape3D.new()
+    var forma := CapsuleShape3D.new()
+    forma.radius = 0.4
+    forma.height = 1.8
+    colisao.shape = forma
+    jogador.add_child(colisao)
 
-    var sol := DirectionalLight3D.new()
-    sol.rotation_degrees = Vector3(-48, -25, 0)
-    sol.light_energy = 1.1
-    add_child(sol)
+    var corpo := MeshInstance3D.new()
+    var malha := CapsuleMesh.new()
+    malha.radius = 0.4
+    malha.height = 1.8
+    corpo.mesh = malha
+    corpo.material_override = StandardMaterial3D.new()
+    corpo.material_override.albedo_color = Color(0.35, 0.2, 0.7)
+    jogador.add_child(corpo)
 
-func criar_camera() -> void:
-    var camera := Camera3D.new()
-    camera.name = "Camera3D"
-    camera.position = Vector3(42, 38, 48)
-    add_child(camera)
-    camera.look_at(Vector3.ZERO, Vector3.UP)
+    var chao := StaticBody3D.new()
+    add_child(chao)
+    var piso := MeshInstance3D.new()
+    var plano := PlaneMesh.new()
+    plano.size = Vector2(200, 200)
+    piso.mesh = plano
+    piso.material_override = StandardMaterial3D.new()
+    piso.material_override.albedo_color = Color(0.24, 0.32, 0.25)
+    chao.add_child(piso)
+
+    var colisao_piso := CollisionShape3D.new()
+    var forma_piso := BoxShape3D.new()
+    forma_piso.size = Vector3(200, 0.2, 200)
+    colisao_piso.shape = forma_piso
+    chao.add_child(colisao_piso)
+    chao.position.y = -0.1
+
+    camera = Camera3D.new()
+    jogador.add_child(camera)
+    camera.position = Vector3(0, 4, 7)
+    camera.rotation_degrees = Vector3(-18, 0, 0)
     camera.current = true
+
+    criar_controles()
+
+func _physics_process(delta: float) -> void:
+    var teclado := Input.get_vector(
+        "ui_left", "ui_right", "ui_up", "ui_down"
+    )
+    var movimento := direcao
+    if teclado.length() > movimento.length():
+        movimento = teclado
+
+    jogador.velocity.x = movimento.x * VELOCIDADE
+    jogador.velocity.z = movimento.y * VELOCIDADE
+
+    if not jogador.is_on_floor():
+        jogador.velocity.y -= 20.0 * delta
+    else:
+        jogador.velocity.y = 0.0
+
+    jogador.move_and_slide()
+
+func criar_controles() -> void:
+    var camada := CanvasLayer.new()
+    add_child(camada)
+
+    var painel := HBoxContainer.new()
+    painel.position = Vector2(20, 300)
+    painel.add_theme_constant_override("separation", 8)
+    camada.add_child(painel)
+
+    criar_botao(painel, "◀", Vector2(-1, 0))
+    criar_botao(painel, "▲", Vector2(0, -1))
+    criar_botao(painel, "▼", Vector2(0, 1))
+    criar_botao(painel, "▶", Vector2(1, 0))
+
+func criar_botao(painel: HBoxContainer, texto: String,
+        eixo: Vector2) -> void:
+    var botao := Button.new()
+    botao.text = texto
+    botao.custom_minimum_size = Vector2(58, 58)
+    painel.add_child(botao)
+
+    botao.button_down.connect(func():
+        direcao = eixo
+    )
+    botao.button_up.connect(func():
+        if direcao == eixo:
+            direcao = Vector2.ZERO
+    )
